@@ -1,0 +1,44 @@
+name: Build Android UnrealMemoryTools
+on:
+  # 当你往main分支推送代码时，自动触发构建
+  push:
+    branches: [ main ]
+  # 也支持手动点按钮触发构建
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 拉取你的项目代码（包括子模块，比如KittyMemoryEx）
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # 安装适配性最好的Android NDK r21e（解决Termux里的所有路径问题）
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r21e
+          add-to-path: false
+
+      # 配置CMake，自动用NDK工具链交叉编译arm64-v8a架构
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=30
+
+      # 编译项目
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      # 编译完成后，把可执行文件打包成下载包
+      - name: Upload compiled artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnrealMemoryTools-arm64-v8a
+          path: outputs/arm64-v8a/UnrealMemoryTools
